@@ -27,7 +27,7 @@ import os
 import logging
 import unittest
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -113,7 +113,7 @@ class TestProductModel(unittest.TestCase):
         product.create()
         fetched = Product.find(product.id)
         self.assertEqual(product, fetched)
-        
+
         # Modify the fetched item
         fetched.name = "New Name"
         fetched.description = "New Description"
@@ -128,4 +128,97 @@ class TestProductModel(unittest.TestCase):
         self.assertAlmostEqual(updated.price, Decimal(5.65))
         self.assertEqual(updated.available, False)
         self.assertEqual(updated.category, Category.HOUSEWARES)
-        
+
+    def test_fail_update_a_product(self):
+        """It should fail if id is not provided for update"""
+        product = ProductFactory()
+        product.create()
+        product.id = None
+        with self.assertRaises(DataValidationError):
+            product.update()
+
+    def test_delete_a_product(self):
+        """It should Delete a Product"""
+        product = ProductFactory()
+        # Create
+        product.create()
+        self.assertEqual(len(Product.all()), 1)
+        # Delete
+        product.delete()
+        self.assertEqual(len(Product.all()), 0)
+
+    def test_list_all_products(self):
+        """It should list all products."""
+        products = Product.all()
+        self.assertEqual(len(products), 0)
+        for _ in range(5):
+            product = ProductFactory()
+            product.create()
+        self.assertEqual(len(Product.all()), 5)
+
+    def test_find_by_name(self):
+        """It should return a product given a name"""
+        products = []
+        for _ in range(5):
+            product = ProductFactory()
+            product.create()
+            products.append(product)
+
+        first_product = products[0]
+        product_count = len(list(
+            filter(lambda x: x.name == first_product.name, products)
+        ))
+        fetched = Product.find_by_name(first_product.name)
+        self.assertEqual(len(fetched), product_count)
+
+    def test_find_by_availability(self):
+        """It should return products filtered by availability"""
+        products = []
+        for _ in range(5):
+            product = ProductFactory()
+            product.create()
+            products.append(product)
+
+        first_product_availability = products[0].available
+        products_count = len(list(filter(lambda x: x.available == first_product_availability, products)))
+        fetched = Product.find_by_availability(first_product_availability)
+        self.assertEqual(len(fetched), products_count)
+
+    def test_find_by_category(self):
+        """It should return products filtered by category"""
+        products = []
+        for _ in range(5):
+            product = ProductFactory()
+            product.create()
+            products.append(product)
+
+        first_product_category = products[0].category
+        product_count = len(list(
+            filter(lambda x: x.category == first_product_category, products)
+        ))
+        fetched = Product.find_by_category(first_product_category)
+        self.assertEqual(len(fetched), product_count)
+
+    def test_find_by_price(self):
+        """It should return products filtered by price"""
+        products = []
+        for _ in range(5):
+            product = ProductFactory()
+            product.create()
+            products.append(product)
+
+        first_product_price = products[0].price
+        product_count = len(list(
+            filter(lambda x: x.price == first_product_price, products)
+        ))
+        fetched = Product.find_by_price(first_product_price)
+        self.assertEqual(len(fetched), product_count)
+
+    def test_deserialize(self):
+        """It should raise validation error if invalide available value is passed"""
+        product = ProductFactory()
+        serialized = product.serialize()
+
+        serialized['available'] = "Yes"
+        with self.assertRaises(DataValidationError):
+            product.deserialize(data=serialized)
